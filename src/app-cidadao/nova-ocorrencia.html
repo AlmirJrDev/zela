@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zela+ — Nova ocorrência</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <header>
+    <h1>Zela+</h1>
+    <nav>
+      <a href="index.html">Início</a>
+      <a href="nova-ocorrencia.html">Nova ocorrência</a>
+    </nav>
+  </header>
+  <main>
+    <h2>Nova ocorrência</h2>
+    <form id="form-ocorrencia">
+      <label for="categoria">Categoria</label>
+      <select id="categoria" required></select>
+
+      <label for="descricao">Descrição (até 500 caracteres)</label>
+      <textarea id="descricao" maxlength="500" rows="4" required></textarea>
+
+      <label for="endereco">Endereço ou ponto de referência</label>
+      <input id="endereco" required>
+
+      <label for="foto">Foto</label>
+      <input id="foto" type="file" accept="image/*" required>
+
+      <button type="submit">Enviar ocorrência</button>
+    </form>
+    <div id="confirmacao" class="aviso" hidden></div>
+  </main>
+
+  <script src="../shared/config.js"></script>
+  <script>
+    const select = document.getElementById("categoria");
+    CATEGORIAS.forEach((nome) => select.add(new Option(nome, nome)));
+
+    // Protocolo no formato ZELA-AAAA-NNNNNN (RF04)
+    function gerarProtocolo() {
+      const numero = String(Date.now()).slice(-6);
+      return `ZELA-${new Date().getFullYear()}-${numero}`;
+    }
+
+    document.getElementById("form-ocorrencia").addEventListener("submit", (evento) => {
+      evento.preventDefault();
+      const ocorrencia = {
+        protocolo: gerarProtocolo(),
+        categoria: select.value,
+        descricao: document.getElementById("descricao").value,
+        endereco: document.getElementById("endereco").value,
+        data: new Date().toLocaleDateString("pt-BR"),
+        status: STATUS[0],
+      };
+
+      const salvas = JSON.parse(localStorage.getItem("zela-ocorrencias") || "[]");
+      salvas.push(ocorrencia);
+      localStorage.setItem("zela-ocorrencias", JSON.stringify(salvas));
+
+      const confirmacao = document.getElementById("confirmacao");
+      confirmacao.textContent = `Ocorrência registrada! Protocolo: ${ocorrencia.protocolo}`;
+      confirmacao.hidden = false;
+      evento.target.reset();
+    });
+  </script>
+</body>
+</html>
