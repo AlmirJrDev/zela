@@ -11,6 +11,7 @@ Projeto da disciplina de Engenharia de Software (UNASP), usado também na ativid
 | `src/app-cidadao/` | Protótipo do app do cidadão: registrar e acompanhar ocorrências |
 | `src/painel-web/` | Protótipo do painel da prefeitura: triagem e indicadores |
 | `src/shared/` | Dados e estilos compartilhados (categorias, status) |
+| `backend/` | API REST em Spring Boot (Projeto Integrador) — veja `backend/README.md` |
 | `docs/` | Requisitos e plano de configuração |
 
 ## Como abrir
