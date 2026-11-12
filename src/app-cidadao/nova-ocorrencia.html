@@ -37,7 +37,8 @@
   <script src="../shared/config.js"></script>
   <script>
     const select = document.getElementById("categoria");
-    CATEGORIAS.forEach((nome) => select.add(new Option(nome, nome)));
+    // Esta tela ainda grava no navegador; a ligação com a API vem no próximo PR (T03 a T05)
+    Object.keys(ICONES_CATEGORIA).forEach((nome) => select.add(new Option(nome, nome)));
 
     // Protocolo no formato ZELA-AAAA-NNNNNN (RF04)
     function gerarProtocolo() {
@@ -53,7 +54,7 @@
         descricao: document.getElementById("descricao").value,
         endereco: document.getElementById("endereco").value,
         data: new Date().toLocaleDateString("pt-BR"),
-        status: STATUS[0],
+        status: STATUS.ABERTA.rotulo,
       };
 
       const salvas = JSON.parse(localStorage.getItem("zela-ocorrencias") || "[]");

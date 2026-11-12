@@ -16,7 +16,9 @@ Projeto da disciplina de Engenharia de Software (UNASP), usado também na ativid
 
 ## Como abrir
 
-Não precisa instalar nada: abra `src/app-cidadao/index.html` no navegador.
+1. Suba a API: na pasta `backend`, rode `mvnw.cmd spring-boot:run` (fica em `http://localhost:8080`).
+2. Sirva a pasta `src` por HTTP, por exemplo com `npx http-server src -p 5500`.
+3. Abra `http://localhost:5500/app-cidadao/` no navegador e crie uma conta.
 
 ## Equipe
 
