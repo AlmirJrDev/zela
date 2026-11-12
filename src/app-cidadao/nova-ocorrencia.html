@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Zela+ — Nova ocorrência</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <link rel="stylesheet" href="../shared/style.css">
 </head>
 <body>
@@ -13,59 +14,206 @@
       <a href="index.html">Início</a>
       <a href="nova-ocorrencia.html">Nova ocorrência</a>
     </nav>
+    <div class="usuario">Olá, <span id="usuario-nome"></span> <button type="button" onclick="sair()">Sair</button></div>
   </header>
   <main>
     <h2>Nova ocorrência</h2>
-    <form id="form-ocorrencia">
-      <label for="categoria">Categoria</label>
-      <select id="categoria" required></select>
+    <!-- RNF02: o registro cabe em 3 telas -->
+    <ol class="passos">
+      <li id="passo-1" class="atual">1. Categoria e foto</li>
+      <li id="passo-2">2. Local e descrição</li>
+      <li id="passo-3">3. Confirmação</li>
+    </ol>
 
-      <label for="descricao">Descrição (até 500 caracteres)</label>
-      <textarea id="descricao" maxlength="500" rows="4" required></textarea>
+    <!-- T03: categoria e foto (RF02) -->
+    <section id="tela-categoria" class="cartao">
+      <h3>O que você viu?</h3>
+      <div id="categorias" class="grade-categorias" role="group" aria-label="Categorias"></div>
 
-      <label for="endereco">Endereço ou ponto de referência</label>
-      <input id="endereco" required>
+      <label for="foto">Foto do problema (câmera ou galeria)</label>
+      <input id="foto" type="file" accept="image/*" capture="environment">
+      <img id="previa" class="previa-foto" alt="Prévia da foto" hidden>
+      <p class="meta">A foto aparece aqui só como prévia: o envio do arquivo depende do endpoint de upload, que ainda não existe na API.</p>
 
-      <label for="foto">Foto</label>
-      <input id="foto" type="file" accept="image/*" required>
+      <button type="button" id="ir-local" disabled>Continuar</button>
+    </section>
 
-      <button type="submit">Enviar ocorrência</button>
-    </form>
-    <div id="confirmacao" class="aviso" hidden></div>
+    <!-- T04: local e descrição (RF03, RF09) -->
+    <section id="tela-local" class="cartao" hidden>
+      <h3>Onde fica?</h3>
+      <p class="meta" id="dica-gps"></p>
+      <div id="mapa" class="mapa"></div>
+
+      <div id="parecidas" class="aviso" hidden></div>
+
+      <form id="form-local">
+        <label for="descricao">Descrição (até 500 caracteres)</label>
+        <textarea id="descricao" maxlength="500" rows="3" required placeholder="Ex.: buraco grande na faixa da direita, perto do ponto de ônibus"></textarea>
+
+        <label for="endereco">Endereço ou ponto de referência</label>
+        <input id="endereco" maxlength="200">
+
+        <label for="bairro">Bairro</label>
+        <input id="bairro" maxlength="80">
+
+        <button type="button" class="secundario" id="voltar-categoria">Voltar</button>
+        <button type="submit" id="enviar">Enviar ocorrência</button>
+      </form>
+    </section>
+
+    <!-- T05: confirmação com protocolo (RF04) -->
+    <section id="tela-confirmacao" class="cartao" hidden>
+      <h3>Ocorrência registrada!</h3>
+      <p>Guarde o número do protocolo para acompanhar:</p>
+      <p style="font-size:1.6rem;font-weight:700" id="protocolo"></p>
+      <p id="prazo"></p>
+      <a href="index.html" class="botao">Voltar ao início</a>
+      <a href="nova-ocorrencia.html" class="botao" style="background:#fff;color:#1f7a4d;border:1px solid #1f7a4d">Registrar outra</a>
+    </section>
+
+    <div id="erro" class="erro" role="alert" hidden></div>
   </main>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="../shared/config.js"></script>
+  <script src="../shared/api.js"></script>
   <script>
-    const select = document.getElementById("categoria");
-    // Esta tela ainda grava no navegador; a ligação com a API vem no próximo PR (T03 a T05)
-    Object.keys(ICONES_CATEGORIA).forEach((nome) => select.add(new Option(nome, nome)));
+    const RAIO_PARECIDAS = 100; // metros para avisar de ocorrência parecida (RF09)
+    const cidadao = exigirLogin();
+    const caixaErro = document.getElementById("erro");
+    let categoriaEscolhida = null;
+    let mapa = null;
+    let pino = null;
 
-    // Protocolo no formato ZELA-AAAA-NNNNNN (RF04)
-    function gerarProtocolo() {
-      const numero = String(Date.now()).slice(-6);
-      return `ZELA-${new Date().getFullYear()}-${numero}`;
+    function irPara(passo) {
+      ["tela-categoria", "tela-local", "tela-confirmacao"].forEach((id, i) => {
+        document.getElementById(id).hidden = i + 1 !== passo;
+        document.getElementById("passo-" + (i + 1)).classList.toggle("atual", i + 1 === passo);
+      });
+      caixaErro.hidden = true;
+      window.scrollTo(0, 0);
     }
 
-    document.getElementById("form-ocorrencia").addEventListener("submit", (evento) => {
-      evento.preventDefault();
-      const ocorrencia = {
-        protocolo: gerarProtocolo(),
-        categoria: select.value,
-        descricao: document.getElementById("descricao").value,
-        endereco: document.getElementById("endereco").value,
-        data: new Date().toLocaleDateString("pt-BR"),
-        status: STATUS.ABERTA.rotulo,
-      };
+    // ---------- T03 ----------
 
-      const salvas = JSON.parse(localStorage.getItem("zela-ocorrencias") || "[]");
-      salvas.push(ocorrencia);
-      localStorage.setItem("zela-ocorrencias", JSON.stringify(salvas));
+    async function carregarCategorias() {
+      try {
+        const categorias = await api("/categorias");
+        const grade = document.getElementById("categorias");
+        categorias.forEach((c) => {
+          const botao = document.createElement("button");
+          botao.type = "button";
+          botao.setAttribute("aria-pressed", "false");
+          botao.innerHTML = `<span class="icone">${ICONES_CATEGORIA[c.nome] || "📍"}</span>${escapar(c.nome)}`;
+          botao.addEventListener("click", () => {
+            grade.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", "false"));
+            botao.setAttribute("aria-pressed", "true");
+            categoriaEscolhida = c;
+            document.getElementById("ir-local").disabled = false;
+          });
+          grade.appendChild(botao);
+        });
+      } catch (erro) {
+        mostrarErro(caixaErro, erro);
+      }
+    }
 
-      const confirmacao = document.getElementById("confirmacao");
-      confirmacao.textContent = `Ocorrência registrada! Protocolo: ${ocorrencia.protocolo}`;
-      confirmacao.hidden = false;
-      evento.target.reset();
+    document.getElementById("foto").addEventListener("change", (evento) => {
+      const arquivo = evento.target.files[0];
+      const previa = document.getElementById("previa");
+      if (!arquivo) { previa.hidden = true; return; }
+      previa.src = URL.createObjectURL(arquivo);
+      previa.hidden = false;
     });
+
+    document.getElementById("ir-local").addEventListener("click", async () => {
+      irPara(2);
+      if (!mapa) await montarMapa();
+      buscarParecidas();
+    });
+
+    // ---------- T04 ----------
+
+    async function montarMapa() {
+      const pos = await posicaoAtual();
+      document.getElementById("dica-gps").textContent = pos.gps
+        ? "Usamos sua localização. Arraste o pino se precisar ajustar."
+        : "Não conseguimos sua localização. Arraste o pino até o local do problema.";
+      mapa = criarMapa("mapa", pos.lat, pos.lng, 17);
+      pino = L.marker([pos.lat, pos.lng], { draggable: true }).addTo(mapa);
+      pino.on("dragend", buscarParecidas);
+      mapa.on("click", (e) => { pino.setLatLng(e.latlng); buscarParecidas(); });
+    }
+
+    /** RF09: avisa se já existe ocorrência da mesma categoria perto do pino. */
+    async function buscarParecidas() {
+      const caixa = document.getElementById("parecidas");
+      const { lat, lng } = pino.getLatLng();
+      try {
+        const proximas = await api(`/ocorrencias/proximas?lat=${lat}&lng=${lng}&raioMetros=${RAIO_PARECIDAS}`);
+        const parecidas = proximas.filter((o) => o.categoria === categoriaEscolhida.nome);
+        if (!parecidas.length) { caixa.hidden = true; return; }
+        caixa.innerHTML = "<b>Já existe ocorrência parecida aqui perto.</b> Apoiar ajuda a prefeitura a priorizar, sem duplicar o registro:" +
+          parecidas.map((o) => `
+            <div class="cartao" style="margin-top:8px">
+              <b>${escapar(o.protocolo)}</b> ${seloStatus(o.status)} · ${o.distanciaMetros} m<br>
+              ${escapar(o.descricao)}<br>
+              <small>${o.apoios} apoio(s)</small><br>
+              <button type="button" data-apoiar="${o.id}">Apoiar esta ocorrência</button>
+            </div>`).join("");
+        caixa.hidden = false;
+        caixa.querySelectorAll("[data-apoiar]").forEach((b) => b.addEventListener("click", () => apoiar(b)));
+      } catch (erro) {
+        mostrarErro(caixaErro, erro);
+      }
+    }
+
+    async function apoiar(botao) {
+      botao.disabled = true;
+      try {
+        const o = await api(`/ocorrencias/${botao.dataset.apoiar}/apoios`, { metodo: "POST", corpo: { cidadaoId: cidadao.id } });
+        botao.replaceWith(Object.assign(document.createElement("p"), {
+          innerHTML: `<b>Apoio registrado!</b> Agora são ${o.apoios} apoio(s). Você não precisa registrar de novo.`,
+        }));
+      } catch (erro) {
+        botao.disabled = false;
+        mostrarErro(caixaErro, erro);
+      }
+    }
+
+    document.getElementById("voltar-categoria").addEventListener("click", () => irPara(1));
+
+    document.getElementById("form-local").addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const botao = document.getElementById("enviar");
+      botao.disabled = true;
+      const { lat, lng } = pino.getLatLng();
+      try {
+        const o = await api("/ocorrencias", {
+          metodo: "POST",
+          corpo: {
+            cidadaoId: cidadao.id,
+            categoriaId: categoriaEscolhida.id,
+            descricao: document.getElementById("descricao").value.trim(),
+            fotoUrl: null,
+            latitude: lat,
+            longitude: lng,
+            endereco: document.getElementById("endereco").value.trim() || null,
+            bairro: document.getElementById("bairro").value.trim() || null,
+          },
+        });
+        // ---------- T05 ----------
+        document.getElementById("protocolo").textContent = o.protocolo;
+        document.getElementById("prazo").textContent = `Prazo previsto de atendimento: ${dataBR(o.prazoPrevisto)}.`;
+        irPara(3);
+      } catch (erro) {
+        mostrarErro(caixaErro, erro);
+      } finally {
+        botao.disabled = false;
+      }
+    });
+
+    if (cidadao) carregarCategorias();
   </script>
 </body>
 </html>

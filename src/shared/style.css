@@ -162,5 +162,7 @@ a.botao { display: inline-block; margin-top: 16px; padding: 10px 16px; border-ra
 .estrelas button { margin: 0; padding: 4px 8px; font-size: 1.6rem; background: none; color: #c9d2cd; }
 .estrelas button.ativa { color: #e0a800; }
 
+.meta { color: #5b6b63; font-size: .9rem; }
+
 .notificacao { padding: 8px 0; border-bottom: 1px solid #dde5e0; font-size: .95rem; }
 .notificacao.nova { font-weight: 600; }
