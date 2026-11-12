@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Zela+ — App do cidadão</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <link rel="stylesheet" href="../shared/style.css">
 </head>
 <body>
@@ -17,12 +18,53 @@
   </header>
   <main>
     <h2>Viu um problema na rua?</h2>
-    <p>Registre buracos, lâmpadas queimadas e outros problemas do seu bairro e acompanhe até a solução.</p>
-    <a href="nova-ocorrencia.html" class="botao">Registrar ocorrência</a>
+    <p>Veja o que já foi registrado perto de você. Se o problema já estiver no mapa, apoie em vez de registrar de novo.</p>
+    <a href="nova-ocorrencia.html" class="botao">Nova ocorrência</a>
+
+    <!-- T02: mapa com ocorrências próximas (RF08) -->
+    <div id="mapa" class="mapa"></div>
+    <p id="resumo" class="meta"></p>
+    <div id="erro" class="erro" role="alert" hidden></div>
   </main>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="../shared/config.js"></script>
   <script src="../shared/api.js"></script>
-  <script>exigirLogin();</script>
+  <script>
+    const RAIO_METROS = 1000;
+    const cidadao = exigirLogin();
+
+    async function iniciar() {
+      const pos = await posicaoAtual();
+      const mapa = criarMapa("mapa", pos.lat, pos.lng, 15);
+      L.circleMarker([pos.lat, pos.lng], { radius: 7, color: "#1d5fc4", fillOpacity: 1 })
+        .addTo(mapa).bindTooltip(pos.gps ? "Você está aqui" : "Centro padrão (GPS indisponível)");
+
+      try {
+        // "proximas" traz a distância; a lista geral traz as coordenadas — duas chamadas no total
+        const [proximas, todas] = await Promise.all([
+          api(`/ocorrencias/proximas?lat=${pos.lat}&lng=${pos.lng}&raioMetros=${RAIO_METROS}`),
+          api("/ocorrencias"),
+        ]);
+        const porId = new Map(todas.map((o) => [o.id, o]));
+        proximas.forEach((o) => {
+          const d = porId.get(o.id);
+          if (!d) return;
+          const apoios = o.apoios === 1 ? "1 apoio" : `${o.apoios} apoios`;
+          const cor = (STATUS[o.status] || {}).cor || "#5b6b63";
+          L.circleMarker([d.latitude, d.longitude], { radius: 9, color: cor, fillColor: cor, fillOpacity: .8 })
+            .addTo(mapa)
+            .bindPopup(`<b>${escapar(o.protocolo)}</b><br>${escapar(o.categoria)}<br>${seloStatus(o.status)}<br>${escapar(o.descricao)}<br><small>${apoios} · ${o.distanciaMetros} m</small>`);
+        });
+        document.getElementById("resumo").textContent = proximas.length
+          ? `${proximas.length} ocorrência(s) em andamento num raio de ${RAIO_METROS / 1000} km.`
+          : `Nenhuma ocorrência em andamento num raio de ${RAIO_METROS / 1000} km.`;
+      } catch (erro) {
+        mostrarErro(document.getElementById("erro"), erro);
+      }
+    }
+
+    if (cidadao) iniciar();
+  </script>
 </body>
 </html>
