@@ -13,11 +13,16 @@
       <a href="index.html">Início</a>
       <a href="nova-ocorrencia.html">Nova ocorrência</a>
     </nav>
+    <div class="usuario">Olá, <span id="usuario-nome"></span> <button type="button" onclick="sair()">Sair</button></div>
   </header>
   <main>
     <h2>Viu um problema na rua?</h2>
     <p>Registre buracos, lâmpadas queimadas e outros problemas do seu bairro e acompanhe até a solução.</p>
-    <a href="nova-ocorrencia.html"><button type="button">Registrar ocorrência</button></a>
+    <a href="nova-ocorrencia.html" class="botao">Registrar ocorrência</a>
   </main>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/api.js"></script>
+  <script>exigirLogin();</script>
 </body>
 </html>

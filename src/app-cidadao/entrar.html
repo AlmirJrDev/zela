@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zela+ — Entrar</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <header>
+    <h1>Zela+</h1>
+  </header>
+  <main>
+    <h2>Bem-vindo ao Zela+</h2>
+    <p>Entre para registrar e acompanhar os problemas da sua rua.</p>
+
+    <div class="abas" role="tablist">
+      <button type="button" role="tab" id="aba-entrar" aria-selected="true">Entrar</button>
+      <button type="button" role="tab" id="aba-cadastrar" aria-selected="false">Criar conta</button>
+    </div>
+
+    <!-- T01: entrar com e-mail ou telefone (RF01) -->
+    <form id="form-entrar" class="cartao">
+      <label for="login">E-mail ou telefone</label>
+      <input id="login" autocomplete="username" required placeholder="maria@email.com ou 11987654321">
+
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password" required>
+
+      <button type="submit">Entrar</button>
+    </form>
+
+    <!-- T01: criar conta (RF01) -->
+    <form id="form-cadastrar" class="cartao" hidden>
+      <label for="nome">Nome completo</label>
+      <input id="nome" autocomplete="name" required maxlength="120">
+
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="email" required>
+
+      <label for="telefone">Telefone (só números, com DDD)</label>
+      <input id="telefone" inputmode="numeric" autocomplete="tel" pattern="\d{10,11}" placeholder="11987654321">
+
+      <label for="nova-senha">Senha (mínimo 6 caracteres)</label>
+      <input id="nova-senha" type="password" autocomplete="new-password" minlength="6" required>
+
+      <button type="submit">Criar conta</button>
+    </form>
+
+    <div id="erro" class="erro" role="alert" hidden></div>
+  </main>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/api.js"></script>
+  <script>
+    // Quem já está logado vai direto para o início
+    if (lerSessao()) location.href = "index.html";
+
+    const formEntrar = document.getElementById("form-entrar");
+    const formCadastrar = document.getElementById("form-cadastrar");
+    const abaEntrar = document.getElementById("aba-entrar");
+    const abaCadastrar = document.getElementById("aba-cadastrar");
+    const caixaErro = document.getElementById("erro");
+
+    function mostrarAba(cadastrar) {
+      formEntrar.hidden = cadastrar;
+      formCadastrar.hidden = !cadastrar;
+      abaEntrar.setAttribute("aria-selected", String(!cadastrar));
+      abaCadastrar.setAttribute("aria-selected", String(cadastrar));
+      caixaErro.hidden = true;
+    }
+    abaEntrar.addEventListener("click", () => mostrarAba(false));
+    abaCadastrar.addEventListener("click", () => mostrarAba(true));
+
+    async function enviar(form, acao) {
+      const botao = form.querySelector("button[type=submit]");
+      botao.disabled = true;
+      caixaErro.hidden = true;
+      try {
+        await acao();
+        location.href = "index.html";
+      } catch (erro) {
+        mostrarErro(caixaErro, erro);
+      } finally {
+        botao.disabled = false;
+      }
+    }
+
+    formEntrar.addEventListener("submit", (evento) => {
+      evento.preventDefault();
+      enviar(formEntrar, async () => {
+        const resposta = await api("/auth/login", {
+          metodo: "POST",
+          corpo: {
+            login: document.getElementById("login").value.trim(),
+            senha: document.getElementById("senha").value,
+          },
+        });
+        salvarSessao(resposta.cidadao);
+      });
+    });
+
+    formCadastrar.addEventListener("submit", (evento) => {
+      evento.preventDefault();
+      enviar(formCadastrar, async () => {
+        const email = document.getElementById("email").value.trim();
+        const senha = document.getElementById("nova-senha").value;
+        await api("/cidadaos", {
+          metodo: "POST",
+          corpo: {
+            nome: document.getElementById("nome").value.trim(),
+            email,
+            telefone: document.getElementById("telefone").value.trim() || null,
+            senha,
+          },
+        });
+        // Conta criada: entra direto com os mesmos dados
+        const resposta = await api("/auth/login", { metodo: "POST", corpo: { login: email, senha } });
+        salvarSessao(resposta.cidadao);
+      });
+    });
+  </script>
+</body>
+</html>
