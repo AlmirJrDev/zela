@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zela+ — Ordens de serviço</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <header>
+    <h1>Zela+ · Equipe de campo</h1>
+    <div class="usuario"><span id="equipe-atual"></span> <button type="button" id="trocar-equipe" hidden>Trocar equipe</button></div>
+  </header>
+  <main>
+    <!-- Escolha da equipe: a API ainda não tem login de equipe, então a equipe se identifica pelo nome -->
+    <form id="form-equipe" class="cartao" hidden>
+      <h2 style="margin-top:0">Qual é a sua equipe?</h2>
+      <label for="nome-equipe">Nome da equipe, como a prefeitura cadastrou no encaminhamento</label>
+      <input id="nome-equipe" list="equipes-conhecidas" required placeholder="Ex.: Equipe Tapa-Buraco Zona Sul 03">
+      <datalist id="equipes-conhecidas"></datalist>
+      <button type="submit">Ver minhas ordens</button>
+    </form>
+
+    <!-- T08: ordens de serviço (RF12) -->
+    <section id="ordens-secao" hidden>
+      <h2>Ordens de serviço</h2>
+      <p class="meta">Ocorrências encaminhadas para a sua equipe. Inicie quando chegar ao local e conclua com a foto do serviço pronto.</p>
+      <div id="ordens"></div>
+      <p id="vazio" class="aviso" hidden>Nenhuma ordem de serviço em aberto para esta equipe.</p>
+    </section>
+
+    <div id="aviso" class="aviso" role="status" hidden></div>
+    <div id="erro" class="erro" role="alert" hidden></div>
+  </main>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/api.js"></script>
+  <script>
+    const EQUIPE_CHAVE = "zela-equipe";
+    const caixaErro = document.getElementById("erro");
+    const caixaAviso = document.getElementById("aviso");
+
+    function equipeAtual() {
+      try { return localStorage.getItem(EQUIPE_CHAVE); } catch { return null; }
+    }
+
+    function mostrarEscolha() {
+      document.getElementById("form-equipe").hidden = false;
+      document.getElementById("ordens-secao").hidden = true;
+      document.getElementById("trocar-equipe").hidden = true;
+      document.getElementById("equipe-atual").textContent = "";
+      // sugere as equipes que já receberam encaminhamentos
+      Promise.all(["ENCAMINHADA", "EM_EXECUCAO"].map((s) => api(`/ocorrencias?status=${s}`)))
+        .then((listas) => {
+          const nomes = [...new Set(listas.flat().map((o) => o.equipe).filter(Boolean))].sort();
+          document.getElementById("equipes-conhecidas").innerHTML = nomes.map((n) => `<option value="${escapar(n)}">`).join("");
+        })
+        .catch(() => {});
+    }
+
+    document.getElementById("form-equipe").addEventListener("submit", (e) => {
+      e.preventDefault();
+      localStorage.setItem(EQUIPE_CHAVE, document.getElementById("nome-equipe").value.trim());
+      iniciar();
+    });
+
+    document.getElementById("trocar-equipe").addEventListener("click", () => {
+      localStorage.removeItem(EQUIPE_CHAVE);
+      mostrarEscolha();
+    });
+
+    async function carregarOrdens() {
+      const equipe = equipeAtual();
+      const consulta = (s) => api(`/ocorrencias?${new URLSearchParams({ status: s, equipe })}`);
+      const [emExecucao, encaminhadas] = await Promise.all([consulta("EM_EXECUCAO"), consulta("ENCAMINHADA")]);
+      const ordens = [...emExecucao, ...encaminhadas.sort((a, b) => a.prazoPrevisto.localeCompare(b.prazoPrevisto))];
+      document.getElementById("vazio").hidden = ordens.length > 0;
+      document.getElementById("ordens").innerHTML = ordens.map(cartaoOrdem).join("");
+      ordens.forEach(ligarAcoes);
+    }
+
+    function cartaoOrdem(o) {
+      const local = [o.endereco, o.bairro].filter(Boolean).join(" · ") || "Endereço não informado";
+      const mapa = `https://www.openstreetmap.org/?mlat=${o.latitude}&mlon=${o.longitude}#map=18/${o.latitude}/${o.longitude}`;
+      return `
+        <article class="cartao" id="ordem-${o.id}">
+          <h3 style="margin-top:0">${escapar(o.protocolo)} ${seloStatus(o.status)}</h3>
+          <p style="margin:.3em 0"><b>${ICONES_CATEGORIA[o.categoria.nome] || "📍"} ${escapar(o.categoria.nome)}</b> · prazo ${dataBR(o.prazoPrevisto)}</p>
+          <p style="margin:.3em 0">${escapar(o.descricao)}</p>
+          <p style="margin:.3em 0">📍 ${escapar(local)} · <a href="${mapa}" target="_blank" rel="noopener">abrir no mapa</a></p>
+          ${o.fotoUrl ? `<p class="meta" style="margin:.6em 0 0">Foto enviada pelo cidadão</p><img class="previa-foto" src="${escapar(o.fotoUrl)}" alt="Foto original da ocorrência">` : '<p class="meta">O cidadão não enviou foto.</p>'}
+
+          ${o.status === "ENCAMINHADA" ? `
+            <button type="button" data-iniciar="${o.id}">Iniciar serviço</button>` : `
+            <fieldset>
+              <legend>Concluir serviço</legend>
+              <label for="foto-${o.id}">Foto do serviço pronto (obrigatória)</label>
+              <input id="foto-${o.id}" type="file" accept="image/*" capture="environment">
+              <img id="previa-${o.id}" class="previa-foto" alt="Prévia da foto de conclusão" hidden>
+              <label for="obs-${o.id}">Observação (opcional)</label>
+              <input id="obs-${o.id}" maxlength="300" placeholder="Ex.: buraco tapado com asfalto a quente">
+              <button type="button" data-concluir="${o.id}" disabled>Concluir</button>
+            </fieldset>`}
+        </article>`;
+    }
+
+    function ligarAcoes(o) {
+      const iniciar = document.querySelector(`[data-iniciar="${o.id}"]`);
+      if (iniciar) iniciar.addEventListener("click", () => executar(iniciar, async () => {
+        await api(`/ocorrencias/${o.id}/execucao`, { metodo: "PATCH", corpo: { observacao: "Equipe iniciou o serviço no local" } });
+        return `${o.protocolo}: serviço iniciado.`;
+      }));
+
+      const concluir = document.querySelector(`[data-concluir="${o.id}"]`);
+      if (!concluir) return;
+      const campoFoto = document.getElementById(`foto-${o.id}`);
+      campoFoto.addEventListener("change", () => {
+        const arquivo = campoFoto.files[0];
+        const previa = document.getElementById(`previa-${o.id}`);
+        previa.hidden = !arquivo;
+        if (arquivo) previa.src = URL.createObjectURL(arquivo);
+        concluir.disabled = !arquivo;
+      });
+      concluir.addEventListener("click", () => executar(concluir, async () => {
+        concluir.textContent = "Enviando foto...";
+        const fotoConclusaoUrl = await enviarFoto(campoFoto.files[0]);
+        await api(`/ocorrencias/${o.id}/conclusao`, {
+          metodo: "PATCH",
+          corpo: { fotoConclusaoUrl, observacao: document.getElementById(`obs-${o.id}`).value.trim() || null },
+        });
+        return `${o.protocolo}: serviço concluído. O cidadão foi avisado e já pode avaliar.`;
+      }, "Concluir"));
+    }
+
+    async function executar(botao, acao, rotulo) {
+      botao.disabled = true;
+      caixaErro.hidden = true;
+      try {
+        caixaAviso.textContent = await acao();
+        caixaAviso.hidden = false;
+        await carregarOrdens();
+      } catch (erro) {
+        mostrarErro(caixaErro, erro);
+        botao.disabled = false;
+        if (rotulo) botao.textContent = rotulo;
+      }
+    }
+
+    function iniciar() {
+      const equipe = equipeAtual();
+      if (!equipe) return mostrarEscolha();
+      document.getElementById("form-equipe").hidden = true;
+      document.getElementById("ordens-secao").hidden = false;
+      document.getElementById("trocar-equipe").hidden = false;
+      document.getElementById("equipe-atual").textContent = equipe;
+      carregarOrdens().catch((erro) => mostrarErro(caixaErro, erro));
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>

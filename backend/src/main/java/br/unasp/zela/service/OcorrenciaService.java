@@ -69,8 +69,12 @@ public class OcorrenciaService {
     }
 
     @Transactional(readOnly = true)
-    public List<Ocorrencia> listar(StatusOcorrencia status, Long categoriaId, String bairro) {
-        return repo.filtrar(status, categoriaId, (bairro == null || bairro.isBlank()) ? null : bairro.trim());
+    public List<Ocorrencia> listar(StatusOcorrencia status, Long categoriaId, String bairro, String equipe) {
+        return repo.filtrar(status, categoriaId, vazioParaNulo(bairro), vazioParaNulo(equipe));
+    }
+
+    private static String vazioParaNulo(String texto) {
+        return (texto == null || texto.isBlank()) ? null : texto.trim();
     }
 
     /** RF05: ocorrências do cidadão com o status atual. */

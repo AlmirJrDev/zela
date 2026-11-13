@@ -27,7 +27,7 @@ Importe `postman/zela-api.postman_collection.json` e use *Run collection* na ord
 | GET, POST, PUT, DELETE | `/api/categorias`, `/api/categorias/{id}` | CRUD de categorias |
 | GET, POST, PUT, DELETE | `/api/secretarias`, `/api/secretarias/{id}` | CRUD de secretarias |
 | POST | `/api/ocorrencias` | RF02, RF03, RF04 registrar com protocolo |
-| GET | `/api/ocorrencias?status=&categoriaId=&bairro=` | listar e filtrar |
+| GET | `/api/ocorrencias?status=&categoriaId=&bairro=&equipe=` | listar e filtrar (o filtro de equipe alimenta o app da equipe, T08) |
 | GET | `/api/ocorrencias/{id}`, `/api/ocorrencias/protocolo/{protocolo}` | consultar |
 | PUT, DELETE | `/api/ocorrencias/{id}` | editar e excluir (só ABERTA) |
 | GET | `/api/cidadaos/{id}/ocorrencias` | RF05 minhas ocorrências |

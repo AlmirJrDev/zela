@@ -28,9 +28,11 @@ public interface OcorrenciaRepository extends JpaRepository<Ocorrencia, Long> {
             where (:status is null or o.status = :status)
               and (:categoriaId is null or o.categoria.id = :categoriaId)
               and (:bairro is null or lower(o.bairro) = lower(:bairro))
+              and (:equipe is null or lower(o.equipe) = lower(:equipe))
             order by o.dataCriacao desc
             """)
     List<Ocorrencia> filtrar(@Param("status") StatusOcorrencia status,
                              @Param("categoriaId") Long categoriaId,
-                             @Param("bairro") String bairro);
+                             @Param("bairro") String bairro,
+                             @Param("equipe") String equipe);
 }
