@@ -3,15 +3,215 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Zela+ — Painel da prefeitura</title>
+  <title>Zela+ — Fila de triagem</title>
   <link rel="stylesheet" href="../shared/style.css">
 </head>
 <body>
   <header>
     <h1>Zela+ · Painel da prefeitura</h1>
+    <nav>
+      <a href="index.html">Fila de triagem</a>
+    </nav>
   </header>
-  <main>
-    <p>Em construção: a fila de triagem (RF10) chega na versão 2.0.0.</p>
+  <main class="largo">
+    <h2>Fila de triagem</h2>
+    <p class="meta">Valide, recategorize, una duplicadas, recuse com motivo ou encaminhe à secretaria (RF10, RF11).</p>
+
+    <form id="filtros" class="filtros">
+      <div>
+        <label for="filtro-status">Situação</label>
+        <select id="filtro-status">
+          <option value="TRIAGEM">Aguardando triagem (abertas e validadas)</option>
+          <option value="ABERTA">Só abertas</option>
+          <option value="VALIDADA">Só validadas</option>
+          <option value="ENCAMINHADA">Encaminhadas</option>
+        </select>
+      </div>
+      <div>
+        <label for="filtro-categoria">Categoria</label>
+        <select id="filtro-categoria"><option value="">Todas</option></select>
+      </div>
+      <div>
+        <label for="filtro-bairro">Bairro</label>
+        <input id="filtro-bairro" placeholder="Todos">
+      </div>
+    </form>
+
+    <div class="painel">
+      <!-- T09: tabela de ocorrências -->
+      <div class="tabela-rolagem">
+        <table>
+          <thead>
+            <tr><th>Protocolo</th><th>Categoria</th><th>Bairro</th><th>Registro</th><th>Prazo</th><th>Apoios</th><th>Status</th></tr>
+          </thead>
+          <tbody id="linhas"></tbody>
+        </table>
+        <p id="vazio" class="meta" hidden>Nenhuma ocorrência nesta situação.</p>
+      </div>
+
+      <!-- Ações da ocorrência selecionada -->
+      <aside id="painel-acoes" class="cartao" style="margin-top:12px">
+        <p class="meta">Clique numa ocorrência para ver os detalhes e as ações.</p>
+      </aside>
+    </div>
+
+    <div id="aviso" class="aviso" role="status" hidden></div>
+    <div id="erro" class="erro" role="alert" hidden></div>
   </main>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/api.js"></script>
+  <script>
+    const caixaErro = document.getElementById("erro");
+    const caixaAviso = document.getElementById("aviso");
+    let categorias = [];
+    let secretarias = [];
+    let ocorrencias = [];
+    let selecionadaId = null;
+
+    function avisar(texto) {
+      caixaAviso.textContent = texto;
+      caixaAviso.hidden = false;
+      caixaErro.hidden = true;
+      setTimeout(() => { caixaAviso.hidden = true; }, 5000);
+    }
+
+    async function carregarListas() {
+      [categorias, secretarias] = await Promise.all([api("/categorias"), api("/secretarias")]);
+      const filtro = document.getElementById("filtro-categoria");
+      categorias.forEach((c) => filtro.add(new Option(c.nome, c.id)));
+    }
+
+    async function carregarFila() {
+      const status = document.getElementById("filtro-status").value;
+      const categoriaId = document.getElementById("filtro-categoria").value;
+      const bairro = document.getElementById("filtro-bairro").value.trim();
+      const consulta = (s) => {
+        const p = new URLSearchParams({ status: s });
+        if (categoriaId) p.set("categoriaId", categoriaId);
+        if (bairro) p.set("bairro", bairro);
+        return api("/ocorrencias?" + p);
+      };
+      const listas = await Promise.all(status === "TRIAGEM" ? [consulta("ABERTA"), consulta("VALIDADA")] : [consulta(status)]);
+      // mais antigas primeiro: quem espera há mais tempo é atendido antes
+      ocorrencias = listas.flat().sort((a, b) => a.dataCriacao.localeCompare(b.dataCriacao));
+      desenharTabela();
+      if (selecionadaId && !ocorrencias.some((o) => o.id === selecionadaId)) limparSelecao();
+    }
+
+    function desenharTabela() {
+      const hoje = new Date().toISOString().slice(0, 10);
+      document.getElementById("vazio").hidden = ocorrencias.length > 0;
+      document.getElementById("linhas").innerHTML = ocorrencias.map((o) => `
+        <tr class="clicavel ${o.id === selecionadaId ? "selecionada" : ""}" data-id="${o.id}">
+          <td><b>${escapar(o.protocolo)}</b></td>
+          <td>${escapar(o.categoria.nome)}</td>
+          <td>${escapar(o.bairro || "—")}</td>
+          <td>${dataBR(o.dataCriacao)}</td>
+          <td style="${o.prazoPrevisto < hoje ? "color:#c0392b;font-weight:700" : ""}">${dataBR(o.prazoPrevisto)}</td>
+          <td>${o.apoios}</td>
+          <td>${seloStatus(o.status)}</td>
+        </tr>`).join("");
+      document.querySelectorAll("#linhas tr").forEach((tr) => tr.addEventListener("click", () => selecionar(Number(tr.dataset.id))));
+    }
+
+    function limparSelecao() {
+      selecionadaId = null;
+      document.getElementById("painel-acoes").innerHTML = '<p class="meta">Clique numa ocorrência para ver os detalhes e as ações.</p>';
+    }
+
+    function selecionar(id) {
+      selecionadaId = id;
+      desenharTabela();
+      const o = ocorrencias.find((x) => x.id === id);
+      const outras = ocorrencias.filter((x) => x.id !== id);
+      const emTriagem = o.status === "ABERTA" || o.status === "VALIDADA";
+      document.getElementById("painel-acoes").innerHTML = `
+        <h3 style="margin-top:0">${escapar(o.protocolo)} ${seloStatus(o.status)}</h3>
+        <p style="margin:.3em 0"><b>${escapar(o.categoria.nome)}</b> · ${o.apoios} apoio(s)</p>
+        <p style="margin:.3em 0">${escapar(o.descricao)}</p>
+        <p class="meta" style="margin:.3em 0">${escapar([o.endereco, o.bairro].filter(Boolean).join(" · ") || "Sem endereço")}
+          · <a href="https://www.openstreetmap.org/?mlat=${o.latitude}&mlon=${o.longitude}#map=18/${o.latitude}/${o.longitude}" target="_blank" rel="noopener">ver no mapa</a></p>
+        <p class="meta" style="margin:.3em 0">Cidadão: ${escapar(o.cidadaoNome)} · registrada em ${dataBR(o.dataCriacao)}</p>
+        ${o.fotoUrl ? `<img class="previa-foto" src="${escapar(o.fotoUrl)}" alt="Foto da ocorrência">` : '<p class="meta">Sem foto.</p>'}
+
+        ${emTriagem ? `
+        <fieldset>
+          <legend>Triagem (RF10)</legend>
+          <div class="acoes">
+            ${o.status === "ABERTA" ? '<button type="button" id="acao-validar">Validar</button>' : ""}
+          </div>
+          <label for="nova-categoria">Recategorizar</label>
+          <div class="acoes">
+            <select id="nova-categoria" style="flex:1">${categorias.filter((c) => c.id !== o.categoria.id).map((c) => `<option value="${c.id}">${escapar(c.nome)}</option>`).join("")}</select>
+            <button type="button" id="acao-recategorizar" class="secundario">Recategorizar</button>
+          </div>
+          <label for="principal">Unir a uma duplicada</label>
+          <div class="acoes">
+            <select id="principal" style="flex:1">
+              <option value="">Escolha a ocorrência principal</option>
+              ${outras.map((x) => `<option value="${x.id}">${escapar(x.protocolo)} — ${escapar(x.categoria.nome)} — ${escapar(x.bairro || "")}</option>`).join("")}
+            </select>
+            <button type="button" id="acao-unir" class="secundario">Unir</button>
+          </div>
+          <label for="motivo">Recusar com motivo (o cidadão recebe o motivo)</label>
+          <textarea id="motivo" rows="2" maxlength="300"></textarea>
+          <button type="button" id="acao-recusar" class="perigo">Recusar</button>
+        </fieldset>` : ""}
+
+        ${o.status === "VALIDADA" || o.status === "ENCAMINHADA" ? `
+        <fieldset>
+          <legend>${o.status === "ENCAMINHADA" ? "Reencaminhar" : "Encaminhar"} (RF11)</legend>
+          <label for="secretaria">Secretaria</label>
+          <select id="secretaria">${secretarias.map((s) => `<option value="${s.id}" ${o.secretaria && o.secretaria.id === s.id ? "selected" : ""}>${escapar(s.nome)}</option>`).join("")}</select>
+          <label for="equipe">Equipe</label>
+          <input id="equipe" maxlength="120" value="${escapar(o.equipe || "")}" placeholder="Ex.: Equipe Tapa-Buraco Zona Sul 03">
+          <button type="button" id="acao-encaminhar">Encaminhar</button>
+        </fieldset>` : ""}
+        ${o.status === "ABERTA" ? '<p class="meta">Para encaminhar, valide a ocorrência primeiro.</p>' : ""}`;
+
+      ligar("acao-validar", () => triar(o, { acao: "VALIDAR" }, "validada"));
+      ligar("acao-recategorizar", () => triar(o, { acao: "RECATEGORIZAR", categoriaId: Number(valor("nova-categoria")) }, "recategorizada"));
+      ligar("acao-unir", () => {
+        if (!valor("principal")) return mostrarErro(caixaErro, new Error("Escolha a ocorrência principal."));
+        return triar(o, { acao: "UNIR", ocorrenciaPrincipalId: Number(valor("principal")) }, "unida à principal");
+      });
+      ligar("acao-recusar", () => triar(o, { acao: "RECUSAR", motivo: valor("motivo").trim() }, "recusada"));
+      ligar("acao-encaminhar", async () => {
+        const atualizada = await api(`/ocorrencias/${o.id}/encaminhamento`, {
+          metodo: "PATCH",
+          corpo: { secretariaId: Number(valor("secretaria")), equipe: valor("equipe").trim() },
+        });
+        concluirAcao(atualizada, "encaminhada");
+      });
+    }
+
+    async function triar(o, corpo, verbo) {
+      const atualizada = await api(`/ocorrencias/${o.id}/triagem`, { metodo: "PATCH", corpo });
+      concluirAcao(atualizada, verbo);
+    }
+
+    async function concluirAcao(atualizada, verbo) {
+      avisar(`${atualizada.protocolo} ${verbo}. O cidadão foi notificado.`);
+      await carregarFila();
+      if (ocorrencias.some((o) => o.id === atualizada.id)) selecionar(atualizada.id);
+    }
+
+    function valor(id) { return document.getElementById(id).value; }
+
+    function ligar(id, acao) {
+      const botao = document.getElementById(id);
+      if (!botao) return;
+      botao.addEventListener("click", async () => {
+        botao.disabled = true;
+        try { await acao(); } catch (erro) { mostrarErro(caixaErro, erro); } finally { botao.disabled = false; }
+      });
+    }
+
+    document.getElementById("filtros").addEventListener("change", () => carregarFila().catch((e) => mostrarErro(caixaErro, e)));
+    document.getElementById("filtros").addEventListener("submit", (e) => { e.preventDefault(); carregarFila().catch((er) => mostrarErro(caixaErro, er)); });
+
+    carregarListas().then(carregarFila).catch((erro) => mostrarErro(caixaErro, erro));
+  </script>
 </body>
 </html>
