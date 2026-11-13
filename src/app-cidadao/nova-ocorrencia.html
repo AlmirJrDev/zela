@@ -13,6 +13,7 @@
     <nav>
       <a href="index.html">Início</a>
       <a href="nova-ocorrencia.html">Nova ocorrência</a>
+      <a href="minhas-ocorrencias.html">Minhas ocorrências</a>
     </nav>
     <div class="usuario">Olá, <span id="usuario-nome"></span> <button type="button" onclick="sair()">Sair</button></div>
   </header>
@@ -67,7 +68,7 @@
       <p>Guarde o número do protocolo para acompanhar:</p>
       <p style="font-size:1.6rem;font-weight:700" id="protocolo"></p>
       <p id="prazo"></p>
-      <a href="index.html" class="botao">Voltar ao início</a>
+      <a id="acompanhar" href="minhas-ocorrencias.html" class="botao">Acompanhar</a>
       <a href="nova-ocorrencia.html" class="botao" style="background:#fff;color:#1f7a4d;border:1px solid #1f7a4d">Registrar outra</a>
     </section>
 
@@ -204,6 +205,7 @@
         });
         // ---------- T05 ----------
         document.getElementById("protocolo").textContent = o.protocolo;
+        document.getElementById("acompanhar").href = `ocorrencia.html?id=${o.id}`;
         document.getElementById("prazo").textContent = `Prazo previsto de atendimento: ${dataBR(o.prazoPrevisto)}.`;
         irPara(3);
       } catch (erro) {

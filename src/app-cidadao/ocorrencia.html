@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zela+ — Detalhe da ocorrência</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <header>
+    <h1>Zela+</h1>
+    <nav>
+      <a href="index.html">Início</a>
+      <a href="nova-ocorrencia.html">Nova ocorrência</a>
+      <a href="minhas-ocorrencias.html">Minhas ocorrências</a>
+    </nav>
+    <div class="usuario">Olá, <span id="usuario-nome"></span> <button type="button" onclick="sair()">Sair</button></div>
+  </header>
+  <main>
+    <p><a href="minhas-ocorrencias.html">← Minhas ocorrências</a></p>
+
+    <!-- T07: detalhe, linha do tempo e avaliação (RF06, RF07, RF13) -->
+    <section id="detalhe" hidden>
+      <h2 id="titulo"></h2>
+      <div id="resumo" class="cartao"></div>
+
+      <section class="cartao">
+        <h3 style="margin-top:0">Linha do tempo</h3>
+        <ol id="linha-tempo" class="linha-tempo"></ol>
+      </section>
+
+      <section id="avaliacao" class="cartao" hidden></section>
+    </section>
+
+    <div id="erro" class="erro" role="alert" hidden></div>
+  </main>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/api.js"></script>
+  <script>
+    const cidadao = exigirLogin();
+    const caixaErro = document.getElementById("erro");
+    const id = new URLSearchParams(location.search).get("id");
+    let notaEscolhida = 0;
+
+    async function carregar() {
+      const [o, acompanhamento] = await Promise.all([
+        api(`/ocorrencias/${id}`),
+        api(`/ocorrencias/${id}/historico`),
+      ]);
+
+      document.getElementById("titulo").innerHTML = `${escapar(o.protocolo)} ${seloStatus(o.status)}`;
+
+      const linhas = [
+        `<b>${ICONES_CATEGORIA[o.categoria.nome] || "📍"} ${escapar(o.categoria.nome)}</b>`,
+        escapar(o.descricao),
+        [o.endereco, o.bairro].filter(Boolean).map(escapar).join(" · "),
+        `<span class="meta">Registrada em ${dataBR(o.dataCriacao)} · ${o.apoios} apoio(s)</span>`,
+      ];
+      if (!["CONCLUIDA", "RECUSADA", "UNIDA"].includes(o.status)) {
+        linhas.push(`Prazo previsto: <b>${dataBR(acompanhamento.prazoPrevisto)}</b>` +
+          (acompanhamento.atrasada ? ' <span class="selo" style="background:#c0392b">Atrasada</span>' : ""));
+      }
+      if (o.secretaria) linhas.push(`Encaminhada para ${escapar(o.secretaria.nome)} — ${escapar(o.equipe)}`);
+      if (o.motivoRecusa) linhas.push(`<b>Motivo da recusa:</b> ${escapar(o.motivoRecusa)}`);
+      if (o.protocoloPrincipal) linhas.push(`Esta ocorrência foi unida à <b>${escapar(o.protocoloPrincipal)}</b>, que segue em atendimento.`);
+      if (o.fotoUrl) linhas.push(`<span class="meta">Foto enviada</span><br><img class="previa-foto" src="${escapar(o.fotoUrl)}" alt="Foto da ocorrência">`);
+      if (o.fotoConclusaoUrl) linhas.push(`<span class="meta">Foto da conclusão (${dataBR(o.dataConclusao)})</span><br><img class="previa-foto" src="${escapar(o.fotoConclusaoUrl)}" alt="Foto do serviço concluído">`);
+      document.getElementById("resumo").innerHTML = linhas.filter(Boolean).map((l) => `<p style="margin:.4em 0">${l}</p>`).join("");
+
+      // RF06: cada mudança de status com data e observação
+      document.getElementById("linha-tempo").innerHTML = acompanhamento.historico.map((h) => `
+        <li style="--cor:${(STATUS[h.status] || {}).cor || "#1f7a4d"}">
+          ${seloStatus(h.status)} <span class="quando">${dataHoraBR(h.dataHora)}</span><br>
+          ${escapar(h.observacao)}
+        </li>`).join("");
+
+      montarAvaliacao(o);
+      document.getElementById("detalhe").hidden = false;
+    }
+
+    /** RF13: depois de concluída, o autor avalia de 1 a 5. */
+    function montarAvaliacao(o) {
+      const secao = document.getElementById("avaliacao");
+      if (o.status !== "CONCLUIDA") { secao.hidden = true; return; }
+      secao.hidden = false;
+      if (o.avaliacaoNota) {
+        secao.innerHTML = `<h3 style="margin-top:0">Sua avaliação</h3>
+          <div class="estrelas">${[1, 2, 3, 4, 5].map((n) => `<span style="font-size:1.6rem;color:${n <= o.avaliacaoNota ? "#e0a800" : "#c9d2cd"}">★</span>`).join("")}</div>
+          ${o.avaliacaoComentario ? `<p>${escapar(o.avaliacaoComentario)}</p>` : ""}`;
+        return;
+      }
+      if (o.cidadaoId !== cidadao.id) { secao.hidden = true; return; }
+      secao.innerHTML = `<h3 style="margin-top:0">Como foi o atendimento?</h3>
+        <div class="estrelas" role="radiogroup" aria-label="Nota de 1 a 5">
+          ${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-nota="${n}" aria-label="${n} estrela(s)">★</button>`).join("")}
+        </div>
+        <label for="comentario">Comentário (opcional)</label>
+        <textarea id="comentario" maxlength="300" rows="2"></textarea>
+        <button type="button" id="enviar-avaliacao" disabled>Enviar avaliação</button>`;
+      secao.querySelectorAll("[data-nota]").forEach((b) => b.addEventListener("click", () => {
+        notaEscolhida = Number(b.dataset.nota);
+        secao.querySelectorAll("[data-nota]").forEach((x) => x.classList.toggle("ativa", Number(x.dataset.nota) <= notaEscolhida));
+        document.getElementById("enviar-avaliacao").disabled = false;
+      }));
+      document.getElementById("enviar-avaliacao").addEventListener("click", async (e) => {
+        e.target.disabled = true;
+        try {
+          const atualizada = await api(`/ocorrencias/${id}/avaliacao`, {
+            metodo: "POST",
+            corpo: { nota: notaEscolhida, comentario: document.getElementById("comentario").value.trim() || null },
+          });
+          montarAvaliacao(atualizada);
+        } catch (erro) {
+          e.target.disabled = false;
+          mostrarErro(caixaErro, erro);
+        }
+      });
+    }
+
+    if (cidadao) {
+      if (!id) mostrarErro(caixaErro, new Error("Ocorrência não informada."));
+      else carregar().catch((erro) => mostrarErro(caixaErro, erro));
+    }
+  </script>
+</body>
+</html>

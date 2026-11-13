@@ -13,6 +13,7 @@
     <nav>
       <a href="index.html">Início</a>
       <a href="nova-ocorrencia.html">Nova ocorrência</a>
+      <a href="minhas-ocorrencias.html">Minhas ocorrências</a>
     </nav>
     <div class="usuario">Olá, <span id="usuario-nome"></span> <button type="button" onclick="sair()">Sair</button></div>
   </header>
@@ -54,7 +55,7 @@
           const cor = (STATUS[o.status] || {}).cor || "#5b6b63";
           L.circleMarker([d.latitude, d.longitude], { radius: 9, color: cor, fillColor: cor, fillOpacity: .8 })
             .addTo(mapa)
-            .bindPopup(`<b>${escapar(o.protocolo)}</b><br>${escapar(o.categoria)}<br>${seloStatus(o.status)}<br>${escapar(o.descricao)}<br><small>${apoios} · ${o.distanciaMetros} m</small>`);
+            .bindPopup(`<b>${escapar(o.protocolo)}</b><br>${escapar(o.categoria)}<br>${seloStatus(o.status)}<br>${escapar(o.descricao)}<br><small>${apoios} · ${o.distanciaMetros} m</small><br><a href="ocorrencia.html?id=${o.id}">Ver detalhes</a>`);
         });
         document.getElementById("resumo").textContent = proximas.length
           ? `${proximas.length} ocorrência(s) em andamento num raio de ${RAIO_METROS / 1000} km.`
