@@ -12,3 +12,4 @@ O projeto segue o versionamento semântico (`MAIOR.MENOR.CORREÇÃO`).
 - App do cidadão: minhas ocorrências com avisos de status e detalhe com linha do tempo e avaliação (T06, T07; RF05, RF06, RF07, RF13).
 - API e app: envio de foto de verdade, comprimida no celular para até 1 MB (RF02, RNF08).
 - Painel da prefeitura: fila de triagem com validar, recategorizar, unir duplicadas, recusar com motivo e encaminhar (T09; RF10, RF11).
+- Painel da prefeitura: indicadores com tempo médio de solução, % no prazo, gráficos por status, categoria e bairro e mapa de calor (T10, RF14).

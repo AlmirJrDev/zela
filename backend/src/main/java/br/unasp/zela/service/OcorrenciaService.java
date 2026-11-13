@@ -276,8 +276,23 @@ public class OcorrenciaService {
         OptionalDouble media = todas.stream().filter(o -> o.getAvaliacaoNota() != null)
                 .mapToInt(Ocorrencia::getAvaliacaoNota).average();
         Double notaMedia = media.isPresent() ? Math.round(media.getAsDouble() * 10) / 10.0 : null;
+
+        // tempo médio de solução: do registro até a conclusão, em dias com uma casa decimal
+        List<Ocorrencia> concluidas = todas.stream()
+                .filter(o -> o.getStatus() == CONCLUIDA && o.getDataConclusao() != null).toList();
+        OptionalDouble minutos = concluidas.stream()
+                .mapToLong(o -> java.time.Duration.between(o.getDataCriacao(), o.getDataConclusao()).toMinutes())
+                .average();
+        Double tempoMedioSolucaoDias = minutos.isPresent()
+                ? Math.round(minutos.getAsDouble() / 60 / 24 * 10) / 10.0 : null;
+        long concluidasNoPrazo = concluidas.stream()
+                .filter(o -> o.getPrazoPrevisto() == null || !o.getDataConclusao().toLocalDate().isAfter(o.getPrazoPrevisto()))
+                .count();
+        Integer percentualNoPrazo = concluidas.isEmpty() ? null
+                : (int) Math.round(100.0 * concluidasNoPrazo / concluidas.size());
+
         return new OcorrenciaDto.Indicadores(todas.size(), porStatus.get(CONCLUIDA.name()), atrasadas,
-                notaMedia, porStatus, porCategoria, porBairro);
+                notaMedia, tempoMedioSolucaoDias, percentualNoPrazo, porStatus, porCategoria, porBairro);
     }
 
     @Transactional(readOnly = true)

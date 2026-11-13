@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zela+ — Indicadores</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="../shared/style.css">
+  <style>
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 16px; }
+    .kpi { background: #fff; border: 1px solid #dde5e0; border-radius: 8px; padding: 12px 16px; }
+    .kpi b { display: block; font-size: 1.8rem; line-height: 1.2; }
+    .kpi span { color: #5b6b63; font-size: .9rem; }
+    .graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .barras { list-style: none; padding: 0; margin: 8px 0 0; }
+    .barras li { display: grid; grid-template-columns: 150px 1fr 36px; gap: 8px; align-items: center; padding: 4px 0; font-size: .92rem; }
+    .barras .trilho { background: #eef2f0; border-radius: 4px; height: 14px; }
+    .barras .barra { height: 14px; border-radius: 0 4px 4px 0; background: #1f7a4d; min-width: 2px; }
+    .barras .valor { text-align: right; font-variant-numeric: tabular-nums; }
+    .barras li:hover .barra { filter: brightness(1.15); }
+    #mapa-calor { height: 380px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Zela+ · Painel da prefeitura</h1>
+    <nav>
+      <a href="index.html">Fila de triagem</a>
+      <a href="indicadores.html">Indicadores</a>
+    </nav>
+  </header>
+  <main class="largo">
+    <h2>Indicadores (RF14)</h2>
+    <p class="meta" id="atualizado"></p>
+
+    <!-- T10: totais e prazos -->
+    <section class="kpis" id="kpis"></section>
+
+    <section class="graficos">
+      <div class="cartao">
+        <h3 style="margin-top:0">Ocorrências por status</h3>
+        <ul class="barras" id="por-status"></ul>
+      </div>
+      <div class="cartao">
+        <h3 style="margin-top:0">Por categoria</h3>
+        <ul class="barras" id="por-categoria"></ul>
+      </div>
+      <div class="cartao">
+        <h3 style="margin-top:0">Por bairro</h3>
+        <ul class="barras" id="por-bairro"></ul>
+      </div>
+    </section>
+
+    <!-- T10: mapa de calor — cada ocorrência é um círculo translúcido; onde há muitas, a cor fica mais forte -->
+    <section class="cartao">
+      <h3 style="margin-top:0">Onde estão as ocorrências</h3>
+      <p class="meta">Quanto mais forte a cor, mais ocorrências no lugar. Inclui todas as situações.</p>
+      <div id="mapa-calor" class="mapa"></div>
+    </section>
+
+    <div id="erro" class="erro" role="alert" hidden></div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="../shared/config.js"></script>
+  <script src="../shared/api.js"></script>
+  <script>
+    function kpi(valor, rotulo) {
+      return `<div class="kpi"><b>${valor}</b><span>${rotulo}</span></div>`;
+    }
+
+    /** Barras horizontais; cor única, exceto por status, que usa a cor de cada status com o nome ao lado. */
+    function barras(id, dados, cores = {}) {
+      const linhas = Object.entries(dados).sort((a, b) => b[1] - a[1]);
+      const maximo = Math.max(1, ...linhas.map(([, v]) => v));
+      document.getElementById(id).innerHTML = linhas.map(([nome, v]) => {
+        const rotulo = (STATUS[nome] && STATUS[nome].rotulo) || nome;
+        return `<li title="${escapar(rotulo)}: ${v}">
+          <span>${escapar(rotulo)}</span>
+          <span class="trilho"><span class="barra" style="display:block;width:${(v / maximo) * 100}%;${cores[nome] ? `background:${cores[nome]}` : ""}"></span></span>
+          <span class="valor">${v}</span>
+        </li>`;
+      }).join("") || '<li class="meta">Sem dados.</li>';
+    }
+
+    /** Menos de um dia vira horas, para não aparecer "0 dias". */
+    function tempoLegivel(dias) {
+      if (dias == null) return "—";
+      if (dias >= 1) return `${dias.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} dias`;
+      const horas = Math.round(dias * 24);
+      return horas < 1 ? "< 1 hora" : `${horas} h`;
+    }
+
+    async function carregar() {
+      const [ind, ocorrencias] = await Promise.all([api("/indicadores"), api("/ocorrencias")]);
+      const formato = (n, casas = 1) => n == null ? "—" : n.toLocaleString("pt-BR", { maximumFractionDigits: casas });
+
+      document.getElementById("kpis").innerHTML = [
+        kpi(ind.total, "ocorrências registradas"),
+        kpi(ind.concluidas, "concluídas"),
+        kpi(ind.atrasadas, "em aberto com prazo vencido"),
+        kpi(tempoLegivel(ind.tempoMedioSolucaoDias), "tempo médio de solução"),
+        kpi(ind.percentualNoPrazo == null ? "—" : `${ind.percentualNoPrazo}%`, "concluídas dentro do prazo"),
+        kpi(ind.notaMedia == null ? "—" : `${formato(ind.notaMedia)} ★`, "nota média dos cidadãos"),
+      ].join("");
+
+      const coresStatus = Object.fromEntries(Object.entries(STATUS).map(([k, s]) => [k, s.cor]));
+      barras("por-status", Object.fromEntries(Object.entries(ind.porStatus).filter(([, v]) => v > 0)), coresStatus);
+      barras("por-categoria", ind.porCategoria);
+      barras("por-bairro", ind.porBairro);
+
+      const centro = ocorrencias.length
+        ? [ocorrencias.reduce((s, o) => s + o.latitude, 0) / ocorrencias.length,
+           ocorrencias.reduce((s, o) => s + o.longitude, 0) / ocorrencias.length]
+        : MAPA_CENTRO_PADRAO;
+      const mapa = criarMapa("mapa-calor", centro[0], centro[1], 14);
+      ocorrencias.forEach((o) => {
+        L.circle([o.latitude, o.longitude], { radius: 120, stroke: false, fillColor: "#c0392b", fillOpacity: 0.25 })
+          .addTo(mapa)
+          .bindTooltip(`${o.protocolo} · ${o.categoria.nome} · ${(STATUS[o.status] || {}).rotulo || o.status}`);
+      });
+      if (ocorrencias.length > 1) {
+        mapa.fitBounds(ocorrencias.map((o) => [o.latitude, o.longitude]), { padding: [40, 40], maxZoom: 16 });
+      }
+
+      document.getElementById("atualizado").textContent = `Atualizado em ${new Date().toLocaleString("pt-BR")}.`;
+    }
+
+    carregar().catch((erro) => mostrarErro(document.getElementById("erro"), erro));
+  </script>
+</body>
+</html>
