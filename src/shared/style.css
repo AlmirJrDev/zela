@@ -164,5 +164,24 @@ a.botao { display: inline-block; margin-top: 16px; padding: 10px 16px; border-ra
 
 .meta { color: #5b6b63; font-size: .9rem; }
 
+/* ---------- painel da prefeitura ---------- */
+
+main.largo { max-width: 1200px; }
+.painel { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .painel { grid-template-columns: 1fr; } }
+.filtros { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; }
+.filtros label { margin-top: 0; font-weight: 600; font-size: .9rem; }
+.filtros select, .filtros input { width: auto; min-width: 160px; }
+.tabela-rolagem { overflow-x: auto; margin-top: 12px; }
+tr.clicavel { cursor: pointer; }
+tr.clicavel td:first-child { white-space: nowrap; }
+tr.clicavel:hover td { background: #f0f6f2; }
+tr.selecionada td { background: #e3f3ea; }
+.acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.acoes button { margin: 0; }
+button.perigo { background: #c0392b; }
+fieldset { border: 1px solid #dde5e0; border-radius: 8px; margin: 12px 0 0; padding: 4px 12px 12px; }
+legend { font-weight: 700; padding: 0 4px; }
+
 .notificacao { padding: 8px 0; border-bottom: 1px solid #dde5e0; font-size: .95rem; }
 .notificacao.nova { font-weight: 600; }
