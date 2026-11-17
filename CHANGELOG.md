@@ -13,3 +13,4 @@ O projeto segue o versionamento semântico (`MAIOR.MENOR.CORREÇÃO`).
 - API e app: envio de foto de verdade, comprimida no celular para até 1 MB (RF02, RNF08).
 - Painel da prefeitura: fila de triagem com validar, recategorizar, unir duplicadas, recusar com motivo e encaminhar (T09; RF10, RF11).
 - Painel da prefeitura: indicadores com tempo médio de solução, % no prazo, gráficos por status, categoria e bairro e mapa de calor (T10, RF14).
+- App da equipe de campo: ordens de serviço da equipe, iniciar serviço e concluir com foto obrigatória (T08, RF12).

@@ -8,9 +8,10 @@ Projeto da disciplina de Engenharia de Software (UNASP), usado também na ativid
 
 | Pasta | O que é |
 | --- | --- |
-| `src/app-cidadao/` | Protótipo do app do cidadão: registrar e acompanhar ocorrências |
-| `src/painel-web/` | Protótipo do painel da prefeitura: triagem e indicadores |
-| `src/shared/` | Dados e estilos compartilhados (categorias, status) |
+| `src/app-cidadao/` | App do cidadão: entrar, mapa, registrar, acompanhar e avaliar ocorrências (T01 a T07) |
+| `src/app-equipe/` | App da equipe de campo: ordens de serviço e conclusão com foto (T08) |
+| `src/painel-web/` | Painel da prefeitura: fila de triagem e indicadores (T09, T10) |
+| `src/shared/` | Cliente da API, configuração (status, categorias) e estilos compartilhados |
 | `backend/` | API REST em Spring Boot (Projeto Integrador) — veja `backend/README.md` |
 | `docs/` | Requisitos e plano de configuração |
 
