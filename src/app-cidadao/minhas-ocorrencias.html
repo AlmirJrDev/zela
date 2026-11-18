@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zela+ — Minhas ocorrências</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <header>
+    <h1>Zela+</h1>
+    <nav>
+      <a href="index.html">Início</a>
+      <a href="nova-ocorrencia.html">Nova ocorrência</a>
+      <a href="minhas-ocorrencias.html">Minhas ocorrências</a>
+    </nav>
+    <div class="usuario">Olá, <span id="usuario-nome"></span> <button type="button" onclick="sair()">Sair</button></div>
+  </header>
+  <main>
+    <h2>Minhas ocorrências</h2>
+
+    <!-- RF07: avisos de mudança de status -->
+    <section class="cartao" id="secao-notificacoes" hidden>
+      <h3 style="margin-top:0">Avisos <span id="contador-novos" class="selo" style="background:#c0392b" hidden></span></h3>
+      <div id="notificacoes"></div>
+    </section>
+
+    <!-- T06: lista com protocolo, categoria, data e selo de status (RF05) -->
+    <ul id="lista" class="lista-ocorrencias"></ul>
+    <p id="vazio" hidden>Você ainda não registrou nenhuma ocorrência. <a href="nova-ocorrencia.html">Registrar a primeira</a>.</p>
+    <div id="erro" class="erro" role="alert" hidden></div>
+  </main>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/api.js"></script>
+  <script>
+    const cidadao = exigirLogin();
+    const caixaErro = document.getElementById("erro");
+
+    async function carregarOcorrencias() {
+      const ocorrencias = await api(`/cidadaos/${cidadao.id}/ocorrencias`);
+      document.getElementById("vazio").hidden = ocorrencias.length > 0;
+      document.getElementById("lista").innerHTML = ocorrencias.map((o) => `
+        <li><a href="ocorrencia.html?id=${o.id}">
+          <span class="protocolo">${escapar(o.protocolo)}</span>
+          ${seloStatus(o.status)}
+          <span>${ICONES_CATEGORIA[o.categoria.nome] || "📍"} ${escapar(o.categoria.nome)}</span>
+          <span class="meta">${dataBR(o.dataCriacao)}</span>
+          <span class="meta" style="grid-column:1/-1">${escapar(o.descricao)}</span>
+        </a></li>`).join("");
+    }
+
+    async function carregarNotificacoes() {
+      const notificacoes = await api(`/cidadaos/${cidadao.id}/notificacoes`);
+      const novas = notificacoes.filter((n) => !n.lida).length;
+      document.getElementById("secao-notificacoes").hidden = notificacoes.length === 0;
+      const contador = document.getElementById("contador-novos");
+      contador.hidden = novas === 0;
+      contador.textContent = novas === 1 ? "1 novo" : `${novas} novos`;
+      document.getElementById("notificacoes").innerHTML = notificacoes.slice(0, 5).map((n) => `
+        <div class="notificacao ${n.lida ? "" : "nova"}">
+          ${escapar(n.mensagem)}
+          <div class="meta">${dataHoraBR(n.dataHora)}
+            ${n.lida ? "" : `· <a href="#" data-lida="${n.id}">marcar como lido</a>`}</div>
+        </div>`).join("");
+      document.querySelectorAll("[data-lida]").forEach((link) => link.addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await api(`/notificacoes/${link.dataset.lida}/lida`, { metodo: "PATCH" });
+          carregarNotificacoes();
+        } catch (erro) { mostrarErro(caixaErro, erro); }
+      }));
+    }
+
+    if (cidadao) {
+      Promise.all([carregarOcorrencias(), carregarNotificacoes()]).catch((erro) => mostrarErro(caixaErro, erro));
+    }
+  </script>
+</body>
+</html>
