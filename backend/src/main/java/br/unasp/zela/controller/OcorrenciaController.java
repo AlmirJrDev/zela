@@ -36,8 +36,9 @@ public class OcorrenciaController {
     @GetMapping("/ocorrencias")
     public List<OcorrenciaDto.Resposta> listar(@RequestParam(required = false) StatusOcorrencia status,
                                                @RequestParam(required = false) Long categoriaId,
-                                               @RequestParam(required = false) String bairro) {
-        return service.listar(status, categoriaId, bairro).stream().map(OcorrenciaDto.Resposta::de).toList();
+                                               @RequestParam(required = false) String bairro,
+                                               @RequestParam(required = false) String equipe) {
+        return service.listar(status, categoriaId, bairro, equipe).stream().map(OcorrenciaDto.Resposta::de).toList();
     }
 
     /** RF08 — ocorrências próximas de um ponto. */
