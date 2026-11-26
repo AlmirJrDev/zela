@@ -126,6 +126,7 @@ public final class OcorrenciaDto {
 
     /** RF14: indicadores do painel do gestor. */
     public record Indicadores(long total, long concluidas, long atrasadas, Double notaMedia,
+                              Double tempoMedioSolucaoDias, Integer percentualNoPrazo,
                               Map<String, Long> porStatus, Map<String, Long> porCategoria,
                               Map<String, Long> porBairro) {}
 }
