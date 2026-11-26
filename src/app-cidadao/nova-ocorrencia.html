@@ -34,7 +34,7 @@
       <label for="foto">Foto do problema (câmera ou galeria)</label>
       <input id="foto" type="file" accept="image/*" capture="environment">
       <img id="previa" class="previa-foto" alt="Prévia da foto" hidden>
-      <p class="meta">A foto aparece aqui só como prévia: o envio do arquivo depende do endpoint de upload, que ainda não existe na API.</p>
+      <p class="meta">A foto é reduzida no celular para até 1 MB antes do envio.</p>
 
       <button type="button" id="ir-local" disabled>Continuar</button>
     </section>
@@ -190,13 +190,17 @@
       botao.disabled = true;
       const { lat, lng } = pino.getLatLng();
       try {
+        const arquivo = document.getElementById("foto").files[0];
+        botao.textContent = arquivo ? "Enviando foto..." : "Enviando...";
+        const fotoUrl = arquivo ? await enviarFoto(arquivo) : null;
+        botao.textContent = "Enviando...";
         const o = await api("/ocorrencias", {
           metodo: "POST",
           corpo: {
             cidadaoId: cidadao.id,
             categoriaId: categoriaEscolhida.id,
             descricao: document.getElementById("descricao").value.trim(),
-            fotoUrl: null,
+            fotoUrl,
             latitude: lat,
             longitude: lng,
             endereco: document.getElementById("endereco").value.trim() || null,
@@ -212,6 +216,7 @@
         mostrarErro(caixaErro, erro);
       } finally {
         botao.disabled = false;
+        botao.textContent = "Enviar ocorrência";
       }
     });
 

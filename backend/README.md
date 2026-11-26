@@ -40,6 +40,9 @@ Importe `postman/zela-api.postman_collection.json` e use *Run collection* na ord
 | PATCH | `/api/ocorrencias/{id}/execucao`, `/api/ocorrencias/{id}/conclusao` | RF12 execução com foto |
 | POST | `/api/ocorrencias/{id}/avaliacao` | RF13 avaliação |
 | GET | `/api/indicadores` | RF14 indicadores |
+| POST, GET | `/api/fotos` (multipart, campo `arquivo`), `/api/fotos/{nome}` | RF02 e RF12 envio de foto, até 1 MB (RNF08); a URL devolvida vai em `fotoUrl` ou `fotoConclusaoUrl` |
+
+As fotos ficam na pasta `uploads/` (configurável em `zela.fotos.pasta`), que não vai para o git.
 
 ## Ciclo de status
 

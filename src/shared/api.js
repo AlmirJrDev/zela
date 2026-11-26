@@ -31,6 +31,45 @@ function mensagemDeErro(dados, status) {
   return "Erro " + status;
 }
 
+// ---------- fotos (RF02, RF12) ----------
+
+const FOTO_TAMANHO_MAXIMO = 1024 * 1024; // RNF08: até 1 MB
+
+/** Reduz a foto no navegador (lado maior até 1600 px, JPEG) até caber em 1 MB. */
+async function comprimirFoto(arquivo) {
+  const imagem = await createImageBitmap(arquivo);
+  let lado = 1600;
+  let qualidade = 0.85;
+  for (let tentativa = 0; tentativa < 8; tentativa++) {
+    const escala = Math.min(1, lado / Math.max(imagem.width, imagem.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(imagem.width * escala);
+    canvas.height = Math.round(imagem.height * escala);
+    canvas.getContext("2d").drawImage(imagem, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", qualidade));
+    if (blob.size <= FOTO_TAMANHO_MAXIMO) return blob;
+    qualidade = Math.max(0.5, qualidade - 0.1);
+    lado = Math.round(lado * 0.8);
+  }
+  throw new Error("Não foi possível reduzir a foto para 1 MB. Tente outra foto.");
+}
+
+/** Comprime e envia a foto; devolve a URL para usar em fotoUrl ou fotoConclusaoUrl. */
+async function enviarFoto(arquivo) {
+  const blob = await comprimirFoto(arquivo);
+  const formulario = new FormData();
+  formulario.append("arquivo", blob, "foto.jpg");
+  let resposta;
+  try {
+    resposta = await fetch(API_URL + "/fotos", { method: "POST", body: formulario });
+  } catch {
+    throw new Error("Não foi possível enviar a foto. A API está rodando em " + API_URL + "?");
+  }
+  const dados = await resposta.json().catch(() => null);
+  if (!resposta.ok) throw new Error(mensagemDeErro(dados, resposta.status));
+  return dados.url;
+}
+
 // ---------- sessão ----------
 
 function lerSessao() {

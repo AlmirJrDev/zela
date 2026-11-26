@@ -8,6 +8,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
@@ -49,6 +51,16 @@ public class TratadorDeErros {
             MissingServletRequestParameterException.class})
     public ResponseEntity<Erro> requisicaoMalFormada(Exception e, HttpServletRequest req) {
         return montar(HttpStatus.BAD_REQUEST, "Requisição mal formada: verifique o JSON e os parâmetros", req, null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Erro> arquivoGrande(MaxUploadSizeExceededException e, HttpServletRequest req) {
+        return montar(HttpStatus.BAD_REQUEST, "A foto deve ter no máximo 1 MB", req, null);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Erro> semArquivo(MissingServletRequestPartException e, HttpServletRequest req) {
+        return montar(HttpStatus.BAD_REQUEST, "Envie a foto no campo 'arquivo'", req, null);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
