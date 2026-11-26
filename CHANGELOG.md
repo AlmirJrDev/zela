@@ -8,3 +8,4 @@ O projeto segue o versionamento semântico (`MAIOR.MENOR.CORREÇÃO`).
 - Estrutura inicial do repositório.
 - API REST em Spring Boot com os requisitos RF01 a RF14 e collection do Postman (`backend/`).
 - App do cidadão: tela de entrar e criar conta ligada à API (T01, RF01).
+- App do cidadão: mapa de ocorrências próximas e registro em 3 passos com aviso de ocorrência parecida e apoio (T02 a T05; RF02, RF03, RF04, RF08, RF09).

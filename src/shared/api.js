@@ -100,7 +100,8 @@ function posicaoAtual() {
 
 /** Cria um mapa Leaflet com os mapas do OpenStreetMap. */
 function criarMapa(idElemento, lat, lng, zoom = 16) {
-  const mapa = L.map(idElemento).setView([lat, lng], zoom);
+  // sem zoom pela rodinha, para a página rolar normalmente; o zoom fica nos botões + e −
+  const mapa = L.map(idElemento, { scrollWheelZoom: false }).setView([lat, lng], zoom);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap",
